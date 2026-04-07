@@ -1,10 +1,8 @@
 const db = require("../db/connection");
 
-// POST /inventory
 const createInventory = (req, res) => {
   const { supplier_id, product_name, quantity, price } = req.body;
 
-  // Check all fields are present
   if (
     supplier_id === undefined ||
     !product_name ||
@@ -17,49 +15,54 @@ const createInventory = (req, res) => {
     });
   }
 
-  // Quantity must be >= 0
   if (quantity < 0) {
     return res.status(400).json({ message: "Quantity must be 0 or more." });
   }
 
-  // Price must be > 0
   if (price <= 0) {
     return res.status(400).json({ message: "Price must be greater than 0." });
   }
 
-  // Check supplier exists
-  const supplier = db
-    .prepare("SELECT * FROM suppliers WHERE id = ?")
-    .get(supplier_id);
-  if (!supplier) {
-    return res.status(400).json({
-      message: `Invalid supplier_id: No supplier found with id ${supplier_id}.`,
-    });
-  }
+  db.get(
+    "SELECT * FROM suppliers WHERE id = ?",
+    [supplier_id],
+    (err, supplier) => {
+      if (err) {
+        return res.status(500).json({ message: err.message });
+      }
+      if (!supplier) {
+        return res.status(400).json({
+          message: `Invalid supplier_id: No supplier found with id ${supplier_id}.`,
+        });
+      }
 
-  // Insert into DB
-  const stmt = db.prepare(
-    "INSERT INTO inventory (supplier_id, product_name, quantity, price) VALUES (?, ?, ?, ?)",
-  );
-  const result = stmt.run(supplier_id, product_name.trim(), quantity, price);
-
-  return res.status(201).json({
-    message: "Inventory item created successfully.",
-    item: {
-      id: result.lastInsertRowid,
-      supplier_id,
-      product_name: product_name.trim(),
-      quantity,
-      price,
+      const sql =
+        "INSERT INTO inventory (supplier_id, product_name, quantity, price) VALUES (?, ?, ?, ?)";
+      db.run(
+        sql,
+        [supplier_id, product_name.trim(), quantity, price],
+        function (err) {
+          if (err) {
+            return res.status(500).json({ message: err.message });
+          }
+          return res.status(201).json({
+            message: "Inventory item created successfully.",
+            item: {
+              id: this.lastID,
+              supplier_id,
+              product_name: product_name.trim(),
+              quantity,
+              price,
+            },
+          });
+        },
+      );
     },
-  });
+  );
 };
 
-// GET /inventory
 const getAllInventory = (req, res) => {
-  const items = db
-    .prepare(
-      `
+  const sql = `
     SELECT
       i.id,
       i.product_name,
@@ -71,18 +74,17 @@ const getAllInventory = (req, res) => {
     FROM inventory i
     JOIN suppliers s ON i.supplier_id = s.id
     ORDER BY i.id DESC
-  `,
-    )
-    .all();
-
-  return res.json({ count: items.length, inventory: items });
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    return res.json({ count: rows.length, inventory: rows });
+  });
 };
 
-// GET /inventory/grouped
 const getInventoryGrouped = (req, res) => {
-  const grouped = db
-    .prepare(
-      `
+  const sql = `
     SELECT
       s.id   AS supplier_id,
       s.name AS supplier_name,
@@ -93,11 +95,13 @@ const getInventoryGrouped = (req, res) => {
     JOIN inventory i ON s.id = i.supplier_id
     GROUP BY s.id, s.name, s.city
     ORDER BY total_inventory_value DESC
-  `,
-    )
-    .all();
-
-  return res.json({ grouped });
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    return res.json({ grouped: rows });
+  });
 };
 
 module.exports = { createInventory, getAllInventory, getInventoryGrouped };

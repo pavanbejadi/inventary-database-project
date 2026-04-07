@@ -1,6 +1,5 @@
 const db = require("../db/connection");
 
-// POST /supplier
 const createSupplier = (req, res) => {
   const { name, city } = req.body;
 
@@ -10,23 +9,25 @@ const createSupplier = (req, res) => {
       .json({ message: "Both name and city are required." });
   }
 
-  const stmt = db.prepare("INSERT INTO suppliers (name, city) VALUES (?, ?)");
-  const result = stmt.run(name.trim(), city.trim());
-
-  return res.status(201).json({
-    message: "Supplier created successfully.",
-    supplier: {
-      id: result.lastInsertRowid,
-      name: name.trim(),
-      city: city.trim(),
-    },
+  const sql = "INSERT INTO suppliers (name, city) VALUES (?, ?)";
+  db.run(sql, [name.trim(), city.trim()], function (err) {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    return res.status(201).json({
+      message: "Supplier created successfully.",
+      supplier: { id: this.lastID, name: name.trim(), city: city.trim() },
+    });
   });
 };
 
-// GET /supplier
 const getAllSuppliers = (req, res) => {
-  const suppliers = db.prepare("SELECT * FROM suppliers").all();
-  return res.json({ count: suppliers.length, suppliers });
+  db.all("SELECT * FROM suppliers", [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    return res.json({ count: rows.length, suppliers: rows });
+  });
 };
 
 module.exports = { createSupplier, getAllSuppliers };
