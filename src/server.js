@@ -3,7 +3,7 @@ const supplierRoutes = require("./routes/supplierRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 // Parse JSON request bodies
 app.use(express.json());
@@ -12,7 +12,7 @@ app.use(express.json());
 app.use("/supplier", supplierRoutes);
 app.use("/inventory", inventoryRoutes);
 
-// Home route - shows all available endpoints
+// Home route
 app.get("/", (req, res) => {
   res.json({
     message: "Zeerostock Inventory API is running.",
